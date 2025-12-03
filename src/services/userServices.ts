@@ -7,7 +7,7 @@ class UserServices {
     public async createUser(newUser: IUser): Promise<IUser> {
         const existingUser = await User.findOne({ email: newUser.email });
         if (existingUser) {
-            throw new Error(`A user with this ${newUser.email} already exists`);
+            throw new Error(`User already exists`);
         }
         const hashPassword = await bcrypt.hash(newUser.password, 10);
         newUser.password = hashPassword;

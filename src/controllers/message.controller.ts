@@ -9,7 +9,7 @@ export default class MessageController {
             const userId = (req as CustomRequest).userId;
 
             const result = await MessageService.deleteMessageById(messageId, userId!);
-            res.status(200).json({ status: result.success, data: null, message: 'Group Conversation created Successfully' });
+            res.status(200).json({ status: result.success, data: null, message: 'Messgae deleted successfully' });
         } catch (error) {
             res.status(500).json({ status: false, data: null, message: [error.message].join(', ') });
         }

@@ -10,7 +10,7 @@ const router = Router();
 
 router.post('/web/user/register', uploadCloudnary.single('image'), UserController.creatUser);
 router.post('/web/user/login', UserController.loginUser);
-router.get('/web/users', verifyToken, UserController.getAllUser);
+router.get('/web/users', UserController.getAllUser);
 router.delete('/web/deleteUser/:id', verifyToken, UserController.deleteUser);
 router.get('/web/user/:userId', verifyToken, UserController.getUserById);
 router.get('/web/users/except-current', verifyToken, UserController.getAllUsersExceptCurrentUser);

@@ -14,6 +14,7 @@ import { v2 as cloudinary } from "cloudinary";
 import uploadCloudnary from "./utils/cloudinary";
 import { JwtUtills } from "./utils/jwtUtiils";
 import { logger } from "./utils/logger";
+import ConversationService from "./services/conversationService";
 
 dotenv.config();
 const app = express();
@@ -60,7 +61,28 @@ app.post("/upload", uploadCloudnary.single("file"), async (req: Request, res: Re
       resource_type: resourceType,
     });
     const fileUrl = result.secure_url;
-    res.status(200).json({ fileUrl });
+    let thumbnailUrl = fileUrl;
+
+    if (resourceType === "image") {
+      thumbnailUrl = cloudinary.url(result.public_id, {
+        width: 250,
+        height: 250,
+        crop: "thumb",
+        gravity: "face",
+        secure: true
+      });
+    } else if (resourceType === "video") {
+      thumbnailUrl = cloudinary.url(result.public_id, {
+        resource_type: "video",
+        format: "jpg",
+        width: 250,
+        height: 250,
+        crop: "thumb",
+        secure: true
+      });
+    }
+
+    res.status(200).json({ fileUrl, thumbnailUrl });
   } catch (error) {
     res.status(500).json({ status: false, data: null, message: [error.message].join(', ') });
   }
@@ -97,13 +119,15 @@ io.on("connection", async (socket) => {
     console.log(`User ${socket.data.userId} joined conversation: ${conversationId}`);
   });
 
-  socket.on("sendMessage", async (messageData: { user: IUser, conversationId: mongoose.Schema.Types.ObjectId, content: string, fileUrl?: string, type: string }) => {
+  socket.on("sendMessage", async (messageData: { user: IUser, conversationId: mongoose.Schema.Types.ObjectId, content: string, fileUrl?: string, thumbnailUrl?: string, type: string, replyTo?: string }) => {
 
     const newMessage = new Message({
       userId: messageData.user._id,
       content: messageData.content || messageData.type,
       fileUrl: messageData.fileUrl || "",
+      thumbnailUrl: messageData.thumbnailUrl || messageData.fileUrl || "",
       type: messageData.type,
+      replyTo: messageData.replyTo ? new mongoose.Types.ObjectId(messageData.replyTo) : null,
       createdAt: new Date(),
     });
 
@@ -113,10 +137,11 @@ io.on("connection", async (socket) => {
     if (conversation) {
       conversation.messages.push(newMessage._id as mongoose.Schema.Types.ObjectId);
       await conversation.save();
-      console.log("Message saved to conversation:", conversation._id);
+
+      const populatedMessage = await Message.findById(newMessage._id).populate('replyTo');
 
       io.to(messageData.conversationId.toString()).emit("receiveMessage", {
-        ...newMessage.toObject(),
+        ...populatedMessage?.toObject(),
         user: messageData.user,
         conversationId: messageData.conversationId,
       });
@@ -124,13 +149,26 @@ io.on("connection", async (socket) => {
       conversation.members.forEach((member) => {
         if (userSockets.has(member.toString()) && member.toString() !== messageData.user._id.toString()) {
           io.to(userSockets.get(member.toString())!).emit("receiveMessage", {
-            ...newMessage.toObject(),
+            ...populatedMessage?.toObject(),
             conversationId: messageData.conversationId,
           });
         }
       });
     } else {
       console.log("Conversation not found");
+    }
+  });
+
+  socket.on("reactToMessage", async (data: { messageId: string, emoji: string, conversationId: string }) => {
+    try {
+      const updatedMessage = await ConversationService.addReaction(data.messageId, socket.data.userId, data.emoji);
+      io.to(data.conversationId).emit("messageReactionUpdated", {
+        messageId: data.messageId,
+        reactions: updatedMessage.reactions,
+        conversationId: data.conversationId
+      });
+    } catch (error) {
+      console.error("Error adding reaction:", error);
     }
   });
 
@@ -144,7 +182,7 @@ io.on("connection", async (socket) => {
 
   socket.on("markMessagesRead", async (conversationId: mongoose.Schema.Types.ObjectId, userId: mongoose.Schema.Types.ObjectId) => {
     try {
-      const conversation = await Conversation.findById(conversationId).populate("messages");
+      const conversation = await Conversation.findById(conversationId);
       if (!conversation) return;
       await Message.updateMany(
         {
@@ -155,7 +193,6 @@ io.on("connection", async (socket) => {
         { $set: { isRead: true } }
       );
       io.to(conversationId.toString()).emit("messagesMarkedRead", { conversationId, userId });
-      console.log(`Messages marked as read in conversation: ${conversationId}`);
     } catch (error) {
       console.error("Error marking messages as read:", error);
     }

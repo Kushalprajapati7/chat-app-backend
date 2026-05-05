@@ -17,9 +17,11 @@ export default class ConversationController {
 
     static async getMessagesByConversationId(req: Request, res: Response): Promise<void> {
         const { conversationId } = req.params;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
         try {
             if (!conversationId) throw new Error("Conversation ID is required");
-            const conversation = await ConversationService.getMessagesByConversationId(conversationId);
+            const conversation = await ConversationService.getMessagesByConversationId(conversationId, page, limit);
             res.status(200).json({ success: true, message: "Messages retrieved successfully", data: conversation.messages });
         } catch (error) {
             res.status(500).json({ status: false, data: null, message: [error.message].join(', ') });
@@ -121,4 +123,14 @@ export default class ConversationController {
         }
     }
 
+    static async getSharedMedia(req: Request, res: Response): Promise<void> {
+        try {
+            const { conversationId } = req.params;
+            if (!conversationId) throw new Error("Conversation ID is required");
+            const media = await ConversationService.getSharedMedia(conversationId);
+            res.status(200).json({ status: true, data: media, message: 'Shared media retrieved successfully' });
+        } catch (error) {
+            res.status(500).json({ status: false, data: null, message: error.message });
+        }
+    }
 }

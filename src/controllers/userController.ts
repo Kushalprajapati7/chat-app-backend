@@ -75,4 +75,34 @@ export default class UserController {
             res.status(500).json({ status: false, data: null, message: [error.message].join(', ') });
         }
     }
+
+    static async verifyEmail(req: Request, res: Response): Promise<void> {
+        try {
+            const token = req.query.token as string;
+            await userServices.verifyEmail(token);
+            res.status(200).json({ status: true, message: 'Email verified successfully! You can now log in.' });
+        } catch (error) {
+            res.status(400).json({ status: false, message: error.message });
+        }
+    }
+
+    static async updateProfile(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = (req as CustomRequest).userId;
+            if (!userId) throw new Error('User Id not found');
+            const updateData = req.body;
+
+            if (req.file) {
+                const base64String = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+                const result = await cloudinary.uploader.upload(base64String, { folder: "uploads" });
+                updateData.avatar = result.secure_url;
+            }
+
+            const updatedUser = await userServices.updateProfile(userId.toString(), updateData);
+            res.status(200).json({ status: true, data: updatedUser, message: 'Profile updated successfully' });
+        } catch (error) {
+            res.status(500).json({ status: false, data: null, message: error.message });
+        }
+    }
+
 }

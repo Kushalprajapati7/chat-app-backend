@@ -132,7 +132,7 @@ export default class ConversationService {
         return conversations;
     }
     
-    public static async getMessagesByConversationId(conversationId: string) {
+    public static async getMessagesByConversationId(conversationId: string, page: number = 1, limit: number = 20) {
         if (!conversationId) {
             throw new Error("Conversation ID is required");
         }
@@ -185,6 +185,18 @@ export default class ConversationService {
                 }
             },
             {
+                $sort: { "messages.createdAt": -1 }
+            },
+            {
+                $skip: (page - 1) * limit
+            },
+            {
+                $limit: limit
+            },
+            {
+                $sort: { "messages.createdAt": 1 }
+            },
+            {
                 $lookup: {
                     from: "users",
                     localField: "messages.userId",
@@ -199,25 +211,53 @@ export default class ConversationService {
                 }
             },
             {
+                $lookup: {
+                    from: "messages",
+                    localField: "messages.replyTo",
+                    foreignField: "_id",
+                    as: "messages.replyToData"
+                }
+            },
+            {
+                $unwind: {
+                    path: "$messages.replyToData",
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
                 $group: {
                     _id: "$_id",
                     createdAt: { $first: "$createdAt" },
                     messages: {
                         $push: {
-                            _id: "$messages._id",
-                            content: "$messages.content",
-                            type: "$messages.type",
-                            fileUrl: "$messages.fileUrl",
-                            isDeleted: "$messages.isDeleted",
-                            createdAt: "$messages.createdAt",
-                            userId: "$messages.user._id",
-                            user: {
-                                _id: "$messages.user._id",
-                                username: "$messages.user.username",
-                                email: "$messages.user.email",
-                                avatar: "$messages.user.avatar",
-                                isOnline: "$messages.user.isOnline",
-                                lastSeen: "$messages.user.lastSeen"
+                            $cond: {
+                                if: { $gt: ["$messages._id", null] },
+                                then: {
+                                    _id: "$messages._id",
+                                    content: "$messages.content",
+                                    type: "$messages.type",
+                                    fileUrl: "$messages.fileUrl",
+                                    thumbnailUrl: { $ifNull: ["$messages.thumbnailUrl", "$messages.fileUrl"] },
+                                    isDeleted: "$messages.isDeleted",
+                                    createdAt: "$messages.createdAt",
+                                    userId: "$messages.user._id",
+                                    reactions: "$messages.reactions",
+                                    user: {
+                                        _id: "$messages.user._id",
+                                        username: "$messages.user.username",
+                                        email: "$messages.user.email",
+                                        avatar: "$messages.user.avatar",
+                                        isOnline: "$messages.user.isOnline",
+                                        lastSeen: "$messages.user.lastSeen"
+                                    },
+                                    replyTo: {
+                                        _id: "$messages.replyToData._id",
+                                        content: "$messages.replyToData.content",
+                                        type: "$messages.replyToData.type",
+                                        userId: "$messages.replyToData.userId"
+                                    }
+                                },
+                                else: "$$REMOVE"
                             }
                         }
                     }
@@ -462,6 +502,52 @@ export default class ConversationService {
         return conversation;
     }
 
+    public static async addReaction(messageId: string, userId: string, emoji: string) {
+        const message = await Message.findById(messageId);
+        if (!message) throw new Error("Message not found");
 
+        const reactionIndex = message.reactions.findIndex(r => r.userId.toString() === userId);
+        if (reactionIndex > -1) {
+            if (message.reactions[reactionIndex].emoji === emoji) {
+                message.reactions.splice(reactionIndex, 1);
+            } else {
+                message.reactions[reactionIndex].emoji = emoji;
+            }
+        } else {
+            message.reactions.push({ userId: new mongoose.Types.ObjectId(userId) as any, emoji });
+        }
 
+        await message.save();
+        return message;
+    }
+    public static async getSharedMedia(conversationId: string) {
+        return await Conversation.aggregate([
+            { $match: { _id: new mongoose.Types.ObjectId(conversationId) } },
+            {
+                $lookup: {
+                    from: "messages",
+                    localField: "messages",
+                    foreignField: "_id",
+                    as: "allMessages"
+                }
+            },
+            { $unwind: "$allMessages" },
+            {
+                $match: {
+                    "allMessages.type": { $in: ['image', 'video', 'audio', 'pdf'] },
+                    "allMessages.isDeleted": { $ne: true }
+                }
+            },
+            { $sort: { "allMessages.createdAt": -1 } },
+            {
+                $project: {
+                    _id: "$allMessages._id",
+                    fileUrl: "$allMessages.fileUrl",
+                    thumbnailUrl: { $ifNull: ["$allMessages.thumbnailUrl", "$allMessages.fileUrl"] },
+                    type: "$allMessages.type",
+                    createdAt: "$allMessages.createdAt"
+                }
+            }
+        ]);
+    }
 }

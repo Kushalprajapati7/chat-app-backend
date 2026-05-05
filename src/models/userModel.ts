@@ -8,6 +8,10 @@ export interface IUser extends Document {
     avatar: string;
     isOnline: boolean;
     lastSeen: Date;
+    isVerified: boolean;
+    verificationToken?: string;
+    bio: string;
+    status: 'Available' | 'Away' | 'Busy';
 }
 
 const UserSchema = new Schema<IUser>({
@@ -38,6 +42,23 @@ const UserSchema = new Schema<IUser>({
     },
     lastSeen: {
         type: Date
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    verificationToken: {
+        type: String,
+        default: null
+    },
+    bio: {
+        type: String,
+        default: 'Hey there! I am using Chat App.'
+    },
+    status: {
+        type: String,
+        enum: ['Available', 'Away', 'Busy'],
+        default: 'Available'
     }
 });
 

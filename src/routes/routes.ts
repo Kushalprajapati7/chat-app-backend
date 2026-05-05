@@ -9,6 +9,7 @@ import JitsiCallController from "../controllers/jitsiCall.Controller";
 const router = Router();
 
 router.post('/web/user/register', uploadCloudnary.single('image'), UserController.creatUser);
+router.get('/web/user/verify-email', UserController.verifyEmail);
 router.post('/web/user/login', UserController.loginUser);
 router.get('/web/users', UserController.getAllUser);
 router.delete('/web/deleteUser/:id', verifyToken, UserController.deleteUser);
@@ -30,5 +31,8 @@ router.delete('/conversations/:conversationId', verifyToken, ConversationControl
 router.delete('/messages/:messageId', verifyToken, MessageController.deleteMessage);
 
 router.get('/jitsi-room/:roomName', verifyToken, JitsiCallController.generateJitsiToken);
+
+router.get('/conversations/:conversationId/media', verifyToken, ConversationController.getSharedMedia);
+router.patch('/web/user/profile', verifyToken, uploadCloudnary.single('image'), UserController.updateProfile);
 
 export default router;

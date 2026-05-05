@@ -4,13 +4,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
+    service: 'gmail',
     auth: {
         user: process.env.SMTP_USER, 
         pass: process.env.SMTP_PASS?.replace(/\s/g, '')
     },
+});
+
+transporter.verify((error, success) => {
+    if (error) {
+        console.error('❌ Email Transporter Error:', error);
+    } else {
+        console.log('✅ Email Transporter is ready to send emails');
+    }
 });
 
 export const sendVerificationEmail = async (toEmail: string, verificationToken: string) => {

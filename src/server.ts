@@ -15,8 +15,11 @@ import uploadCloudnary from "./utils/cloudinary";
 import { JwtUtills } from "./utils/jwtUtiils";
 import { logger } from "./utils/logger";
 import ConversationService from "./services/conversationService";
+import dns from "dns";
 
 dotenv.config();
+dns.setDefaultResultOrder('ipv4first');
+
 const app = express();
 const port = process.env.PORT ?? 8080;
 const server = http.createServer(app);

@@ -9,7 +9,6 @@ import JitsiCallController from "../controllers/jitsiCall.Controller";
 const router = Router();
 
 router.post('/web/user/register', uploadCloudnary.single('image'), UserController.creatUser);
-router.get('/web/user/verify-email', UserController.verifyEmail);
 router.post('/web/user/login', UserController.loginUser);
 router.get('/web/users', UserController.getAllUser);
 router.delete('/web/deleteUser/:id', verifyToken, UserController.deleteUser);

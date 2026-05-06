@@ -76,16 +76,6 @@ export default class UserController {
         }
     }
 
-    static async verifyEmail(req: Request, res: Response): Promise<void> {
-        try {
-            const token = req.query.token as string;
-            await userServices.verifyEmail(token);
-            res.status(200).json({ status: true, message: 'Email verified successfully! You can now log in.' });
-        } catch (error) {
-            res.status(400).json({ status: false, message: error.message });
-        }
-    }
-
     static async updateProfile(req: Request, res: Response): Promise<void> {
         try {
             const userId = (req as CustomRequest).userId;

@@ -3,8 +3,6 @@ import { IUser } from "../models/userModel";
 import bcrypt from 'bcrypt'
 import { JwtUtills } from "../utils/jwtUtiils"
 import crypto from 'crypto';
-import { sendVerificationEmail } from './emailService';
-
 class UserServices {
     public async createUser(newUser: IUser): Promise<IUser> {
         const existingUser = await User.findOne({ email: newUser.email });
@@ -13,16 +11,9 @@ class UserServices {
         }
         const hashPassword = await bcrypt.hash(newUser.password, 10);
         newUser.password = hashPassword;
-        newUser.verificationToken = crypto.randomBytes(32).toString('hex');
-        newUser.isVerified = false;
+        newUser.isVerified = true;
         const user = new User(newUser);
         const savedUser = await user.save();
-
-        try {
-            await sendVerificationEmail(savedUser.email, savedUser.verificationToken!);
-        } catch (e) {
-            console.error("Verification email failed", e);
-        }
 
         return savedUser;
     }
@@ -34,7 +25,6 @@ class UserServices {
         if (!user) throw new Error(`User with Email ${email} not found`);
         const pass = await bcrypt.compare(password, user.password);
         if (!pass) throw new Error(`Invalid Credentials`);
-        if (!user.isVerified) throw new Error(`Please verify your email to log in.`);
         const token = JwtUtills.generateToken(user.id);
         return { token, user };
     }
@@ -73,15 +63,6 @@ class UserServices {
         return await User.find({ _id: { $ne: userId } });
     }
 
-    public async verifyEmail(token: string): Promise<void> {
-        if (!token) throw new Error('Verification token is required.');
-        const user = await User.findOne({ verificationToken: token });
-        if (!user) throw new Error('Invalid or expired verification token.');
-
-        user.isVerified = true;
-        user.verificationToken = undefined;
-        await user.save();
-    }
 
     public async updateProfile(userId: string, updateData: { bio?: string, status?: string, avatar?: string }): Promise<IUser | null> {
         if (!userId) throw new Error('User Id is required');
